@@ -84,7 +84,7 @@ configuration:
       stutter_bracket_shortcuts: false
   formatter:
     general:
-      formatter_verilog: istyle
+      formatter_verilog: verible
       formatter_vhdl: standalone
     istyle:
       style: ansi
@@ -95,7 +95,10 @@ configuration:
       use_tabs: false
       indentation_size: 2
     verible:
-      format_args: ''
+      format_args: >-
+        --wrap_spaces 2 --assignment_statement_alignment align
+        --case_items_alignment align --named_parameter_alignment align
+        --port_declarations_alignment align --try_wrap_long_lines
     standalone:
       keyword_case: lowercase
       name_case: lowercase
@@ -319,6 +322,7 @@ configuration:
       vhdl_version: VHDL_1993
       verilog_version: V_2001
       sv_version: SV_2012
+      div_0: SV_2012
       optimization: none
       effort: high
       fsm_encoding: onehot
@@ -327,6 +331,7 @@ configuration:
       dsp_limit: 154
       block_ram_limit: 154
       fast_synthesis: false
+      div_1: false
       top_level: ''
       sim_source_list: []
       simulate_rtl: false

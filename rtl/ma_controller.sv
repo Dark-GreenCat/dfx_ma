@@ -36,14 +36,14 @@ module ma_controller (
   output reg [ 9:0] vrf_ldr_dst_bram_addr,
   output reg [14:0] vrf_ldr_byte_to_transfer,
   input             vrf_ldr_done,
-  
+
   //VRF BRAM2AXI interface
   output reg        vrf_store_start,
   output reg [ 9:0] vrf_store_src_bram_addr,
   output reg [35:0] vrf_store_dst_axi_addr,
   output reg [14:0] vrf_store_byte_to_transfer,
   input             vrf_store_done,
-  
+
 
 
   output reg ma_done
@@ -89,33 +89,33 @@ module ma_controller (
   // Output and control logic
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
-      ma_ddr4_linkup          <= 0;
-      arf_en               <= 0;
-      arf_we               <= 0;
-      arf_addr             <= 0;
-      ma_done              <= 0;
-      effective_addr       <= 0;
-      base_addr            <= 0;
-      mrf_start            <= 0;
-      mrf_en               <= 0;
-      mrf_src_axi_addr     <= 36'd0;
-      mrf_dst_bram_addr    <= 6'd0;
-      mrf_byte_to_transfer <= 15'd0;
+      ma_ddr4_linkup             <= 0;
+      arf_en                     <= 0;
+      arf_we                     <= 0;
+      arf_addr                   <= 0;
+      ma_done                    <= 0;
+      effective_addr             <= 0;
+      base_addr                  <= 0;
+      mrf_start                  <= 0;
+      mrf_en                     <= 0;
+      mrf_src_axi_addr           <= 36'd0;
+      mrf_dst_bram_addr          <= 6'd0;
+      mrf_byte_to_transfer       <= 15'd0;
 
-      vrf_ldr_start <= 0;
-      vrf_ldr_src_axi_addr <= 36'd0;
-      vrf_ldr_dst_bram_addr <= 9'd0;
-      vrf_ldr_byte_to_transfer <= 15'd0;
+      vrf_ldr_start              <= 0;
+      vrf_ldr_src_axi_addr       <= 36'd0;
+      vrf_ldr_dst_bram_addr      <= 9'd0;
+      vrf_ldr_byte_to_transfer   <= 15'd0;
 
-      vrf_store_start <= 0;
-      vrf_store_src_bram_addr <= 9'd0;
-      vrf_store_dst_axi_addr <= 36'd0;
+      vrf_store_start            <= 0;
+      vrf_store_src_bram_addr    <= 9'd0;
+      vrf_store_dst_axi_addr     <= 36'd0;
       vrf_store_byte_to_transfer <= 15'd0;
     end else begin
       case (state)
         WAIT_CALIB: begin
           ma_ddr4_linkup <= &ma_ddr4_calib_complete_i;
-          ma_done     <= 0;
+          ma_done        <= 0;
         end
 
         IDLE: begin
@@ -148,40 +148,38 @@ module ma_controller (
         end
 
         START_TRANSFER: begin
-            if(ma_select_v_m) begin
-                mrf_start            <= 1;
-                mrf_en               <= 1;
-                mrf_src_axi_addr     <= effective_addr[35:0];
-                mrf_dst_bram_addr    <= ma_v_m_reg[5:0];
-                mrf_byte_to_transfer <= 15'd2048;
+          if (ma_select_v_m) begin
+            mrf_start            <= 1;
+            mrf_en               <= 1;
+            mrf_src_axi_addr     <= effective_addr[35:0];
+            mrf_dst_bram_addr    <= ma_v_m_reg[5:0];
+            mrf_byte_to_transfer <= 15'd2048;
+          end else begin
+            if (ma_v_load_or_store == 0) begin
+              vrf_ldr_start            <= 1;
+              vrf_ldr_src_axi_addr     <= effective_addr[35:0];
+              vrf_ldr_dst_bram_addr    <= ma_v_m_reg[9:0];
+              vrf_ldr_byte_to_transfer <= 15'd128;
             end else begin
-                if(ma_v_load_or_store == 0) begin
-                    vrf_ldr_start <= 1;
-                    vrf_ldr_src_axi_addr <= effective_addr[35:0];
-                    vrf_ldr_dst_bram_addr <= ma_v_m_reg[9:0];
-                    vrf_ldr_byte_to_transfer <= 15'd128;
-                end else begin
-                    vrf_store_start <= 1;
-                    vrf_store_dst_axi_addr <= effective_addr[35:0];
-                    vrf_store_src_bram_addr <= ma_v_m_reg[9:0];
-                    vrf_store_byte_to_transfer <= 15'd128;
-                    end
+              vrf_store_start            <= 1;
+              vrf_store_dst_axi_addr     <= effective_addr[35:0];
+              vrf_store_src_bram_addr    <= ma_v_m_reg[9:0];
+              vrf_store_byte_to_transfer <= 15'd128;
             end
+          end
         end
 
         WAIT_DONE: begin
-          mrf_start <= 0;
-          mrf_en    <= ~mrf_done;
-          vrf_ldr_start <= 0;
+          mrf_start       <= 0;
+          mrf_en          <= ~mrf_done;
+          vrf_ldr_start   <= 0;
           vrf_store_start <= 0;
           if (ma_select_v_m) begin
-                ma_done <= &mrf_done;
-            end else begin
-                if (ma_v_load_or_store == 0)
-                    ma_done <= vrf_ldr_done;
-                else
-                    ma_done <= vrf_store_done;
-            end
+            ma_done <= &mrf_done;
+          end else begin
+            if (ma_v_load_or_store == 0) ma_done <= vrf_ldr_done;
+            else ma_done <= vrf_store_done;
+          end
         end
       endcase
     end
