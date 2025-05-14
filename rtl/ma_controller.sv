@@ -1,53 +1,71 @@
 `timescale 1ns / 1ps
 
-module ma_controller (
+`include "ma_define.sv"
+
+module ma_controller #(
+  parameter NUM_OF_DDR4 = 4,
+  parameter DDR4_ADDRWIDTH = 36,
+  parameter ARF_ADDRWIDTH = 5,
+  parameter ARF_DATAWIDTH = DDR4_ADDRWIDTH,
+  parameter VRF_ADDRWIDTH = 10,
+  parameter VRF_DATAWIDTH = 1024,
+  parameter MRF_ADDRWIDTH = 6,
+  parameter MRF_DATAWIDTH = 1024
+) (
   input clk,
   input rst_n,
 
-  // Calibration 
-  input      [3:0] ma_ddr4_calib_complete_i,
-  output reg       ma_ddr4_linkup,
+  input      [NUM_OF_DDR4-1:0] ma_ddr4_calib_complete_i,
+  output reg                   ma_ddr4_linkup_o,
 
-  // Control interface
-  input        ma_start,
-  input        ma_select_v_m,
-  input        ma_v_load_or_store,
-  input [ 9:0] ma_v_m_reg,
-  input [ 4:0] ma_a_reg,
-  input [63:0] ma_a_offset,
+  input                          ma_start_i,
+  input                          ma_select_v_m_i,
+  input                          ma_v_load_or_store_i,
+  input      [VRF_ADDRWIDTH-1:0] ma_v_m_reg_i,
+  input      [ARF_ADDRWIDTH-1:0] ma_a_reg_i,
+  input      [ARF_DATAWIDTH-1:0] ma_a_offset_i,
+  output reg                     ma_done_o,
 
-  // Address register file interface
-  output reg        arf_en,
-  output reg        arf_we,
-  output reg [ 4:0] arf_addr,
-  input      [63:0] arf_dout,
+  output reg                     arf_en_o,
+  output reg                     arf_we_o,
+  output reg [ARF_ADDRWIDTH-1:0] arf_addr_o,
+  input      [ARF_DATAWIDTH-1:0] arf_dout_i,
 
-  // MRF interface
-  output reg        mrf_start,
-  output reg        mrf_en,
-  output reg [35:0] mrf_src_axi_addr,
-  output reg [ 5:0] mrf_dst_bram_addr,
-  output reg [14:0] mrf_byte_to_transfer,
-  input             mrf_done,
-
-  //VRF AXI2BRAM interface
-  output reg        vrf_ldr_start,
-  output reg [35:0] vrf_ldr_src_axi_addr,
-  output reg [ 9:0] vrf_ldr_dst_bram_addr,
-  output reg [14:0] vrf_ldr_byte_to_transfer,
-  input             vrf_ldr_done,
-
-  //VRF BRAM2AXI interface
-  output reg        vrf_store_start,
-  output reg [ 9:0] vrf_store_src_bram_addr,
-  output reg [35:0] vrf_store_dst_axi_addr,
-  output reg [14:0] vrf_store_byte_to_transfer,
-  input             vrf_store_done,
-
-
-
-  output reg ma_done
+  datamover_if.master m_dm_mrf3,
+  datamover_if.master m_dm_mrf2,
+  datamover_if.master m_dm_mrf1,
+  datamover_if.master m_dm_mrf0,
+  datamover_if.master m_dm_vrf_ldr,
+  datamover_if.master m_dm_vrf_str
 );
+
+    // Parameterize the interfaces
+    // MRF interfaces (AXI2BRAM)
+  defparam m_dm_mrf3.AXI_ADDR_WIDTH = DDR4_ADDRWIDTH;
+  defparam m_dm_mrf3.BRAM_ADDR_WIDTH = MRF_ADDRWIDTH;
+  defparam m_dm_mrf3.BYTE_TRANS_WIDTH = 15;
+
+  defparam m_dm_mrf2.AXI_ADDR_WIDTH = DDR4_ADDRWIDTH;
+  defparam m_dm_mrf2.BRAM_ADDR_WIDTH = MRF_ADDRWIDTH;
+  defparam m_dm_mrf2.BYTE_TRANS_WIDTH = 15;
+
+  defparam m_dm_mrf1.AXI_ADDR_WIDTH = DDR4_ADDRWIDTH;
+  defparam m_dm_mrf1.BRAM_ADDR_WIDTH = MRF_ADDRWIDTH;
+  defparam m_dm_mrf1.BYTE_TRANS_WIDTH = 15;
+
+  defparam m_dm_mrf0.AXI_ADDR_WIDTH = DDR4_ADDRWIDTH;
+  defparam m_dm_mrf0.BRAM_ADDR_WIDTH = MRF_ADDRWIDTH;
+  defparam m_dm_mrf0.BYTE_TRANS_WIDTH = 15;
+
+  // VRF Load interface (AXI2BRAM)
+  defparam m_dm_vrf_ldr.AXI_ADDR_WIDTH = DDR4_ADDRWIDTH;
+  defparam m_dm_vrf_ldr.BRAM_ADDR_WIDTH = VRF_ADDRWIDTH;
+  defparam m_dm_vrf_ldr.BYTE_TRANS_WIDTH = 15;
+
+  // VRF Store interface (BRAM2AXI)
+  defparam m_dm_vrf_str.AXI_ADDR_WIDTH = DDR4_ADDRWIDTH;
+  defparam m_dm_vrf_str.BRAM_ADDR_WIDTH = VRF_ADDRWIDTH;
+  defparam m_dm_vrf_str.BYTE_TRANS_WIDTH = 15;
 
   typedef enum logic [2:0] {
     WAIT_CALIB,
@@ -62,8 +80,8 @@ module ma_controller (
 
   state_t state, next_state;
 
-  reg [63:0] base_addr;
-  reg [63:0] effective_addr;
+  reg [DDR4_ADDRWIDTH-1:0] base_addr;
+  reg [DDR4_ADDRWIDTH-1:0] effective_addr;
 
   // State transition
   always_ff @(posedge clk or negedge rst_n) begin
@@ -75,110 +93,137 @@ module ma_controller (
   always_comb begin
     next_state = state;
     case (state)
-      WAIT_CALIB:     if (&ma_ddr4_calib_complete_i) next_state = IDLE;
-      IDLE:           if (ma_start) next_state = READ_ARF;
-      READ_ARF:       next_state = WAIT_ARF;
-      WAIT_ARF:       next_state = WAIT_ARF2;
-      WAIT_ARF2:      next_state = CALC_ADDR;
-      CALC_ADDR:      next_state = START_TRANSFER;
+      WAIT_CALIB: if (&ma_ddr4_calib_complete_i) next_state = IDLE;
+      IDLE: if (ma_start_i) next_state = READ_ARF;
+      READ_ARF: next_state = WAIT_ARF;
+      WAIT_ARF: next_state = WAIT_ARF2;
+      WAIT_ARF2: next_state = CALC_ADDR;
+      CALC_ADDR: next_state = START_TRANSFER;
       START_TRANSFER: next_state = WAIT_DONE;
-      WAIT_DONE:      if (mrf_done) next_state = IDLE;
+      WAIT_DONE:
+      if (m_dm_mrf3.done | m_dm_mrf2.done | m_dm_mrf1.done | m_dm_mrf0.done) next_state = IDLE;
     endcase
   end
 
   // Output and control logic
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
-      ma_ddr4_linkup             <= 0;
-      arf_en                     <= 0;
-      arf_we                     <= 0;
-      arf_addr                   <= 0;
-      ma_done                    <= 0;
+      ma_ddr4_linkup_o           <= 0;
+      arf_en_o                   <= 0;
+      arf_we_o                   <= 0;
+      arf_addr_o                 <= 0;
+      ma_done_o                  <= 0;
       effective_addr             <= 0;
       base_addr                  <= 0;
-      mrf_start                  <= 0;
-      mrf_en                     <= 0;
-      mrf_src_axi_addr           <= 36'd0;
-      mrf_dst_bram_addr          <= 6'd0;
-      mrf_byte_to_transfer       <= 15'd0;
-
-      vrf_ldr_start              <= 0;
-      vrf_ldr_src_axi_addr       <= 36'd0;
-      vrf_ldr_dst_bram_addr      <= 9'd0;
-      vrf_ldr_byte_to_transfer   <= 15'd0;
-
-      vrf_store_start            <= 0;
-      vrf_store_src_bram_addr    <= 9'd0;
-      vrf_store_dst_axi_addr     <= 36'd0;
-      vrf_store_byte_to_transfer <= 15'd0;
+      m_dm_mrf3.start            <= 0;
+      m_dm_mrf2.start            <= 0;
+      m_dm_mrf1.start            <= 0;
+      m_dm_mrf0.start            <= 0;
+      m_dm_vrf_ldr.start         <= 0;
+      m_dm_vrf_str.start         <= 0;
+      m_dm_mrf3.src_axi_addr     <= 0;
+      m_dm_mrf2.src_axi_addr     <= 0;
+      m_dm_mrf1.src_axi_addr     <= 0;
+      m_dm_mrf0.src_axi_addr     <= 0;
+      m_dm_vrf_ldr.src_axi_addr  <= 0;
+      m_dm_vrf_str.dst_axi_addr  <= 0;
+      m_dm_mrf3.dst_bram_addr    <= 0;
+      m_dm_mrf2.dst_bram_addr    <= 0;
+      m_dm_mrf1.dst_bram_addr    <= 0;
+      m_dm_mrf0.dst_bram_addr    <= 0;
+      m_dm_vrf_ldr.dst_bram_addr <= 0;
+      m_dm_vrf_str.src_bram_addr <= 0;
+      m_dm_mrf3.byte_to_trans    <= 0;
+      m_dm_mrf2.byte_to_trans    <= 0;
+      m_dm_mrf1.byte_to_trans    <= 0;
+      m_dm_mrf0.byte_to_trans    <= 0;
+      m_dm_vrf_ldr.byte_to_trans <= 0;
+      m_dm_vrf_str.byte_to_trans <= 0;
     end else begin
       case (state)
         WAIT_CALIB: begin
-          ma_ddr4_linkup <= &ma_ddr4_calib_complete_i;
-          ma_done        <= 0;
+          ma_ddr4_linkup_o <= &ma_ddr4_calib_complete_i;
+          ma_done_o        <= 0;
         end
 
         IDLE: begin
-          arf_en    <= 0;
-          ma_done   <= 0;
-          mrf_start <= 0;
-          mrf_en    <= 0;
+          arf_en_o           <= 0;
+          ma_done_o          <= 0;
+          m_dm_mrf3.start    <= 0;
+          m_dm_mrf2.start    <= 0;
+          m_dm_mrf1.start    <= 0;
+          m_dm_mrf0.start    <= 0;
+          m_dm_vrf_ldr.start <= 0;
+          m_dm_vrf_str.start <= 0;
         end
 
         READ_ARF: begin
-          arf_en   <= 1;
-          arf_we   <= 0;
-          arf_addr <= ma_a_reg;
+          arf_en_o   <= 1;
+          arf_we_o   <= 0;
+          arf_addr_o <= ma_a_reg_i;
         end
 
         WAIT_ARF: begin
-          arf_en    <= 1;
-          base_addr <= arf_dout;
+          arf_en_o  <= 1;
+          base_addr <= arf_dout_i;
         end
 
         WAIT_ARF2: begin
-          arf_en    <= 0;
-          base_addr <= arf_dout;
+          arf_en_o  <= 0;
+          base_addr <= arf_dout_i;
         end
 
         CALC_ADDR: begin
-          arf_en         <= 0;
-          base_addr      <= arf_dout;
-          effective_addr <= arf_dout + ma_a_offset;
+          arf_en_o       <= 0;
+          base_addr      <= arf_dout_i;
+          effective_addr <= arf_dout_i + ma_a_offset_i;
         end
 
         START_TRANSFER: begin
-          if (ma_select_v_m) begin
-            mrf_start            <= 1;
-            mrf_en               <= 1;
-            mrf_src_axi_addr     <= effective_addr[35:0];
-            mrf_dst_bram_addr    <= ma_v_m_reg[5:0];
-            mrf_byte_to_transfer <= 15'd2048;
+          if (ma_select_v_m_i) begin
+            m_dm_mrf3.start         <= 1;
+            m_dm_mrf2.start         <= 1;
+            m_dm_mrf1.start         <= 1;
+            m_dm_mrf0.start         <= 1;
+            m_dm_mrf3.src_axi_addr  <= effective_addr;
+            m_dm_mrf2.src_axi_addr  <= effective_addr + 15'd2048;
+            m_dm_mrf1.src_axi_addr  <= effective_addr + 15'd4096;
+            m_dm_mrf0.src_axi_addr  <= effective_addr + 15'd6144;
+            m_dm_mrf3.dst_bram_addr <= ma_v_m_reg_i[MRF_ADDRWIDTH-1:0];
+            m_dm_mrf2.dst_bram_addr <= ma_v_m_reg_i[MRF_ADDRWIDTH-1:0];
+            m_dm_mrf1.dst_bram_addr <= ma_v_m_reg_i[MRF_ADDRWIDTH-1:0];
+            m_dm_mrf0.dst_bram_addr <= ma_v_m_reg_i[MRF_ADDRWIDTH-1:0];
+            m_dm_mrf3.byte_to_trans <= 15'd2048;
+            m_dm_mrf2.byte_to_trans <= 15'd2048;
+            m_dm_mrf1.byte_to_trans <= 15'd2048;
+            m_dm_mrf0.byte_to_trans <= 15'd2048;
           end else begin
-            if (ma_v_load_or_store == 0) begin
-              vrf_ldr_start            <= 1;
-              vrf_ldr_src_axi_addr     <= effective_addr[35:0];
-              vrf_ldr_dst_bram_addr    <= ma_v_m_reg[9:0];
-              vrf_ldr_byte_to_transfer <= 15'd128;
+            if (ma_v_load_or_store_i == 0) begin
+              m_dm_vrf_ldr.start         <= 1;
+              m_dm_vrf_ldr.src_axi_addr  <= effective_addr;
+              m_dm_vrf_ldr.dst_bram_addr <= ma_v_m_reg_i[VRF_ADDRWIDTH-1:0];
+              m_dm_vrf_ldr.byte_to_trans <= 15'd128;
             end else begin
-              vrf_store_start            <= 1;
-              vrf_store_dst_axi_addr     <= effective_addr[35:0];
-              vrf_store_src_bram_addr    <= ma_v_m_reg[9:0];
-              vrf_store_byte_to_transfer <= 15'd128;
+              m_dm_vrf_str.start         <= 1;
+              m_dm_vrf_str.dst_axi_addr  <= effective_addr;
+              m_dm_vrf_str.src_bram_addr <= ma_v_m_reg_i[VRF_ADDRWIDTH-1:0];
+              m_dm_vrf_str.byte_to_trans <= 15'd128;
             end
           end
         end
 
         WAIT_DONE: begin
-          mrf_start       <= 0;
-          mrf_en          <= ~mrf_done;
-          vrf_ldr_start   <= 0;
-          vrf_store_start <= 0;
-          if (ma_select_v_m) begin
-            ma_done <= &mrf_done;
+          m_dm_mrf3.start    <= 0;
+          m_dm_mrf2.start    <= 0;
+          m_dm_mrf1.start    <= 0;
+          m_dm_mrf0.start    <= 0;
+          m_dm_vrf_ldr.start <= 0;
+          m_dm_vrf_str.start <= 0;
+          if (ma_select_v_m_i) begin
+            ma_done_o <= m_dm_mrf3.done & m_dm_mrf2.done & m_dm_mrf1.done & m_dm_mrf0.done;
           end else begin
-            if (ma_v_load_or_store == 0) ma_done <= vrf_ldr_done;
-            else ma_done <= vrf_store_done;
+            if (ma_v_load_or_store_i == 0) ma_done_o <= m_dm_vrf_ldr.done;
+            else ma_done_o <= m_dm_vrf_str.done;
           end
         end
       endcase
