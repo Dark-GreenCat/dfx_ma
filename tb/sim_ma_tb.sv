@@ -174,37 +174,68 @@ module sim_ma_tb;
       );
     end
   endgenerate
+  logic [9:0] arbiter_bram_a_addr;
+  logic [1023:0] arbiter_bram_a_dout;
+  logic [1023:0] arbiter_bram_a_din;
+  logic arbiter_bram_a_en;
+  logic arbiter_bram_a_we;
+  logic [9:0] arbiter_bram_b_addr;
+  logic [1023:0] arbiter_bram_b_dout;
+  logic [1023:0] arbiter_bram_b_din;
+  logic arbiter_bram_b_en;
+  logic arbiter_bram_b_we;
 
-  // Arbiter instance for VRF load
-  arbiter #(
-    .LATENCY(10)
-  ) arbiter_inst (
+  arbiter # (
+    .VRF_ADDR_WIDTH(10),
+    .VRF_DATA_WIDTH(1024)
+  )
+  arbiter_inst (
     .clk(clk),
     .rst_n(rst_n),
-    .wr_req(m_dm_vrf_ldr_wr_req),
-    .wr_gnt(m_dm_vrf_ldr_wr_gnt),
-    .wr_addr(m_dm_vrf_ldr_wr_addr),
-    .wr_data(m_dm_vrf_ldr_wr_data),
-    .addra(),
-    .douta(),
-    .dina(),
-    .ena(),
-    .wea()
+    .bram_a_addr_o(arbiter_bram_a_addr),
+    .bram_a_dout_i(arbiter_bram_a_dout),
+    .bram_a_din_o(arbiter_bram_a_din),
+    .bram_a_en_o(arbiter_bram_a_en),
+    .bram_a_we_o(arbiter_bram_a_we),
+    .bram_b_addr_o(arbiter_bram_b_addr),
+    .bram_b_dout_i(arbiter_bram_b_dout),
+    .bram_b_din_o(arbiter_bram_b_din),
+    .bram_b_en_o(arbiter_bram_b_en),
+    .bram_b_we_o(arbiter_bram_b_we),
+
+    .ma_v_src_addr_i(),
+    .ma_v_src_data_o(),
+    .ma_read_req_i(),
+    .ma_read_gnt_o(),
+
+    .ma_v_res_addr_i(m_dm_vrf_ldr_wr_addr),
+    .ma_v_res_data_i(m_dm_vrf_ldr_wr_data),
+    .ma_write_req_i(m_dm_vrf_ldr_wr_req),
+    .ma_write_gnt_o(m_dm_vrf_ldr_wr_gnt)
   );
 
   // VRF RAM instance
-  ram_1p #(
-    .DATAWIDTH (VRF_DATAWIDTH),
-    .DEPTH     (1024),
-    .MEMFILE   (""),
-    .READ_DELAY(1)
-  ) ram_1p_vrf_inst (
-    .clk (clk),
-    .en  (arbiter_inst.ena),
-    .we  (arbiter_inst.wea),
-    .addr(arbiter_inst.addra),
-    .din (arbiter_inst.dina),
-    .dout(arbiter_inst.douta)
+  ram_2p # (
+    .DATAWIDTH_A(VRF_DATAWIDTH),
+    .DEPTH_A(1024),
+    .DATAWIDTH_B(VRF_DATAWIDTH),
+    .DEPTH_B(1024),
+    .MEMFILE(""),
+    .READ_DELAY(2)
+  )
+  ram_2p_inst (
+    .clk_a(clk),
+    .en_a(arbiter_bram_a_en),
+    .we_a(arbiter_bram_a_we),
+    .addr_a(arbiter_bram_a_addr),
+    .din_a(arbiter_bram_a_din),
+    .dout_a(arbiter_bram_a_dout),
+    .clk_b(clk),
+    .en_b(arbiter_bram_b_en),
+    .we_b(arbiter_bram_b_we),
+    .addr_b(arbiter_bram_b_addr),
+    .din_b(arbiter_bram_b_din),
+    .dout_b(arbiter_bram_b_dout)
   );
 
   // Clock generation
