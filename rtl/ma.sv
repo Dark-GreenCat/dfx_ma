@@ -73,7 +73,13 @@ module ma #(
   output                     m_dm_vrf_ldr_wr_req,
   input                      m_dm_vrf_ldr_wr_gnt,
   output [VRF_ADDRWIDTH-1:0] m_dm_vrf_ldr_wr_addr,
-  output [VRF_DATAWIDTH-1:0] m_dm_vrf_ldr_wr_data
+  output [VRF_DATAWIDTH-1:0] m_dm_vrf_ldr_wr_data,
+
+  // Arbiter ports for vrf_str
+  output                     m_dm_vrf_str_rd_req,
+  input                      m_dm_vrf_str_rd_gnt,
+  output [VRF_ADDRWIDTH-1:0] m_dm_vrf_str_rd_addr,
+  input  [VRF_DATAWIDTH-1:0] m_dm_vrf_str_rd_data
 );
 
   // Internal signals for datamover connections
@@ -100,6 +106,11 @@ module ma #(
   logic [ VRF_DATAWIDTH-1:0]                     vrf_ldr_bram_wrdata;
   logic                                          vrf_ldr_bram_en;
   logic                                          vrf_ldr_bram_we;
+
+  logic [DDR4_ADDRWIDTH-1:0]                     vrf_str_bram_addr;
+  logic [ VRF_DATAWIDTH-1:0]                     vrf_str_bram_wrdata;
+  logic                                          vrf_str_bram_en;
+  logic                                          vrf_str_bram_we;
 
   ma_controller #(
     .NUM_OF_DDR4   (NUM_OF_DDR4),
@@ -327,4 +338,55 @@ module ma #(
     .wr_data(m_dm_vrf_ldr_wr_data)
   );
 
+  // Datamover for vrf_str (Arbiter to BRAM)
+  arbiter2bram_datamover #(
+    .AXI_ADDRWIDTH (DDR4_ADDRWIDTH),
+    .BRAM_ADDRWIDTH(VRF_ADDRWIDTH),
+    .DATAWIDTH     (VRF_DATAWIDTH)
+  ) arbiter2bram_datamover_vrf_str_inst (
+    .clk(clk),
+    .rst_n(rst_n),
+    .start_i(m_dm_vrf_str_start),
+    .src_addr_i(m_dm_vrf_str_src_bram_addr),
+    .dst_addr_i(m_dm_vrf_str_dst_axi_addr),
+    .done_o(),
+    .rd_req(m_dm_vrf_str_rd_req),
+    .rd_gnt(m_dm_vrf_str_rd_gnt),
+    .rd_addr(m_dm_vrf_str_rd_addr),
+    .rd_data(m_dm_vrf_str_rd_data),
+    .bram_addr(vrf_str_bram_addr),
+    .bram_wrdata(vrf_str_bram_wrdata),
+    .bram_en(vrf_str_bram_en),
+    .bram_we(vrf_str_bram_we)
+  );
+
+  bram2axi_datamover #(
+    .AXI_ADDRWIDTH(DDR4_ADDRWIDTH),
+    .DATAWIDTH    (VRF_DATAWIDTH)
+  ) bram2axi_datamover_inst (
+    .clk(clk),
+    .rst_n(rst_n),
+    .done_o(done_o),
+    .bram_addr(vrf_str_bram_addr),
+    .bram_wrdata(vrf_str_bram_wrdata),
+    .bram_en(vrf_str_bram_en),
+    .bram_we(vrf_str_bram_we),
+    .m_axi_awaddr(),
+    .m_axi_awburst(),
+    .m_axi_awcache(),
+    .m_axi_awlen(),
+    .m_axi_awlock(),
+    .m_axi_awprot(),
+    .m_axi_awsize(),
+    .m_axi_awvalid(),
+    .m_axi_awready(),
+    .m_axi_wdata(),
+    .m_axi_wlast(),
+    .m_axi_wstrb(),
+    .m_axi_wvalid(),
+    .m_axi_wready(),
+    .m_axi_bresp(),
+    .m_axi_bvalid(),
+    .m_axi_bready()
+  );
 endmodule

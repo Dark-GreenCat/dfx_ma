@@ -21,7 +21,7 @@ TB_DIR = tb
 WORK_DIR = work
 
 # Source files
-RTL_SRC = $(RTL_DIR)/ip/ram_2p.sv $(RTL_DIR)/ip/ram_1p.sv $(RTL_DIR)/ma_define.vh $(RTL_DIR)/axi2bram_datamover.sv $(RTL_DIR)/bram2arbiter_datamover.sv $(RTL_DIR)/arbiter.sv $(RTL_DIR)/ma_controller.sv $(RTL_DIR)/ma.sv
+RTL_SRC = $(RTL_DIR)/ip/ram_2p.sv $(RTL_DIR)/ip/ram_1p.sv $(RTL_DIR)/ma_define.vh $(RTL_DIR)/axi2bram_datamover.sv $(RTL_DIR)/bram2arbiter_datamover.sv $(RTL_DIR)/arbiter2bram_datamover.sv $(RTL_DIR)/bram2axi_datamover.sv $(RTL_DIR)/arbiter.sv $(RTL_DIR)/ma_controller.sv $(RTL_DIR)/ma.sv
 TB_SRC = $(TB_DIR)/sim_ram_2p_tb.sv $(TB_DIR)/sim_ram_1p_tb.sv $(TB_DIR)/sim_ma_tb.sv
 MEM_FILE = init.mem
 

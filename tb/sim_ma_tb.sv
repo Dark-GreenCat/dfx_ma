@@ -76,6 +76,11 @@ module sim_ma_tb;
   logic [ VRF_ADDRWIDTH-1:0]                     m_dm_vrf_ldr_wr_addr;
   logic [ VRF_DATAWIDTH-1:0]                     m_dm_vrf_ldr_wr_data;
 
+  logic                                          m_dm_vrf_str_rd_req;
+  logic                                          m_dm_vrf_str_rd_gnt;
+  logic [ VRF_ADDRWIDTH-1:0]                     m_dm_vrf_str_rd_addr;
+  logic [ VRF_DATAWIDTH-1:0]                     m_dm_vrf_str_rd_data;
+
   // Instantiate ma module
   ma #(
     .NUM_OF_DDR4   (NUM_OF_DDR4),
@@ -138,7 +143,11 @@ module sim_ma_tb;
     .m_dm_vrf_ldr_wr_req(m_dm_vrf_ldr_wr_req),
     .m_dm_vrf_ldr_wr_gnt(m_dm_vrf_ldr_wr_gnt),
     .m_dm_vrf_ldr_wr_addr(m_dm_vrf_ldr_wr_addr),
-    .m_dm_vrf_ldr_wr_data(m_dm_vrf_ldr_wr_data)
+    .m_dm_vrf_ldr_wr_data(m_dm_vrf_ldr_wr_data),
+    .m_dm_vrf_str_rd_req(m_dm_vrf_str_rd_req),
+    .m_dm_vrf_str_rd_gnt(m_dm_vrf_str_rd_gnt),
+    .m_dm_vrf_str_rd_addr(m_dm_vrf_str_rd_addr),
+    .m_dm_vrf_str_rd_data(m_dm_vrf_str_rd_data)
   );
 
   // ARF RAM instance
@@ -185,11 +194,10 @@ module sim_ma_tb;
   logic arbiter_bram_b_en;
   logic arbiter_bram_b_we;
 
-  arbiter # (
+  arbiter #(
     .VRF_ADDR_WIDTH(10),
     .VRF_DATA_WIDTH(1024)
-  )
-  arbiter_inst (
+  ) arbiter_inst (
     .clk(clk),
     .rst_n(rst_n),
     .bram_a_addr_o(arbiter_bram_a_addr),
@@ -203,38 +211,37 @@ module sim_ma_tb;
     .bram_b_en_o(arbiter_bram_b_en),
     .bram_b_we_o(arbiter_bram_b_we),
 
-    .ma_v_src_addr_i(),
-    .ma_v_src_data_o(),
-    .ma_read_req_i(),
-    .ma_read_gnt_o(),
+    .ma_v_src_addr_i(m_dm_vrf_str_rd_addr),
+    .ma_v_src_data_o(m_dm_vrf_str_rd_data),
+    .ma_read_req_i  (m_dm_vrf_str_rd_req),
+    .ma_read_gnt_o  (m_dm_vrf_str_rd_gnt),
 
     .ma_v_res_addr_i(m_dm_vrf_ldr_wr_addr),
     .ma_v_res_data_i(m_dm_vrf_ldr_wr_data),
-    .ma_write_req_i(m_dm_vrf_ldr_wr_req),
-    .ma_write_gnt_o(m_dm_vrf_ldr_wr_gnt)
+    .ma_write_req_i (m_dm_vrf_ldr_wr_req),
+    .ma_write_gnt_o (m_dm_vrf_ldr_wr_gnt)
   );
 
   // VRF RAM instance
-  ram_2p # (
+  ram_2p #(
     .DATAWIDTH_A(VRF_DATAWIDTH),
-    .DEPTH_A(1024),
+    .DEPTH_A    (1024),
     .DATAWIDTH_B(VRF_DATAWIDTH),
-    .DEPTH_B(1024),
-    .MEMFILE(""),
-    .READ_DELAY(2)
-  )
-  ram_2p_inst (
-    .clk_a(clk),
-    .en_a(arbiter_bram_a_en),
-    .we_a(arbiter_bram_a_we),
+    .DEPTH_B    (1024),
+    .MEMFILE    ("tb/init.mem"),
+    .READ_DELAY (2)
+  ) vrf_bram (
+    .clk_a (clk),
+    .en_a  (arbiter_bram_a_en),
+    .we_a  (arbiter_bram_a_we),
     .addr_a(arbiter_bram_a_addr),
-    .din_a(arbiter_bram_a_din),
+    .din_a (arbiter_bram_a_din),
     .dout_a(arbiter_bram_a_dout),
-    .clk_b(clk),
-    .en_b(arbiter_bram_b_en),
-    .we_b(arbiter_bram_b_we),
+    .clk_b (clk),
+    .en_b  (arbiter_bram_b_en),
+    .we_b  (arbiter_bram_b_we),
     .addr_b(arbiter_bram_b_addr),
-    .din_b(arbiter_bram_b_din),
+    .din_b (arbiter_bram_b_din),
     .dout_b(arbiter_bram_b_dout)
   );
 
@@ -334,6 +341,7 @@ module sim_ma_tb;
     @(posedge ma_ddr4_linkup_o);
 
     // Test 1: LDR.V V2, 0x100(A4)
+    @(posedge clk);
     ma_start_i           = 1;
     ma_select_v_m_i      = 0;
     ma_v_load_or_store_i = 0;
@@ -343,6 +351,18 @@ module sim_ma_tb;
     @(posedge clk);
     ma_start_i = 0;
     @(posedge ma_done_o);
+
+    // Test 2: STR.V V3, 0x100(A4)
+    @(posedge clk);
+    ma_start_i           = 1;
+    ma_select_v_m_i      = 0;
+    ma_v_load_or_store_i = 1;
+    ma_v_m_reg_i         = 3;
+    ma_a_reg_i           = 4;
+    ma_a_offset_i        = 16'h100;
+    @(posedge clk);
+    ma_start_i = 0;
+    // @(posedge ma_done_o);
 
     repeat (300) @(posedge clk);
     $finish;
