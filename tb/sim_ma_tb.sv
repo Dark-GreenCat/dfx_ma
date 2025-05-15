@@ -31,6 +31,51 @@ module sim_ma_tb;
   logic [ ARF_ADDRWIDTH-1:0]                     arf_addr_o;
   logic [ ARF_DATAWIDTH-1:0]                     arf_dout_i;
 
+  // AXI4 ports for mrf0 to mrf3
+  logic [               0:3][DDR4_ADDRWIDTH-1:0] m_dm_mrf_m_axi_araddr;
+  logic [               0:3][               1:0] m_dm_mrf_m_axi_arburst;
+  logic [               0:3][               3:0] m_dm_mrf_m_axi_arcache;
+  logic [               0:3][               7:0] m_dm_mrf_m_axi_arlen;
+  logic [               0:3]                     m_dm_mrf_m_axi_arlock;
+  logic [               0:3][               2:0] m_dm_mrf_m_axi_arprot;
+  logic [               0:3][               2:0] m_dm_mrf_m_axi_arsize;
+  logic [               0:3]                     m_dm_mrf_m_axi_arvalid;
+  logic [               0:3]                     m_dm_mrf_m_axi_arready;
+  logic [               0:3][ MRF_DATAWIDTH-1:0] m_dm_mrf_m_axi_rdata;
+  logic [               0:3]                     m_dm_mrf_m_axi_rlast;
+  logic [               0:3][               1:0] m_dm_mrf_m_axi_rresp;
+  logic [               0:3]                     m_dm_mrf_m_axi_rvalid;
+  logic [               0:3]                     m_dm_mrf_m_axi_rready;
+
+  // BRAM ports for mrf0 to mrf3
+  logic [               0:3][ MRF_ADDRWIDTH-1:0] m_dm_mrf_bram_addr;
+  logic [               0:3][ MRF_DATAWIDTH-1:0] m_dm_mrf_bram_wrdata;
+  logic [               0:3]                     m_dm_mrf_bram_en;
+  logic [               0:3]                     m_dm_mrf_bram_we;
+
+  // AXI4 ports for vrf_ldr
+  logic [DDR4_ADDRWIDTH-1:0]                     m_dm_vrf_ldr_m_axi_araddr;
+  logic [               1:0]                     m_dm_vrf_ldr_m_axi_arburst;
+  logic [               3:0]                     m_dm_vrf_ldr_m_axi_arcache;
+  logic [               7:0]                     m_dm_vrf_ldr_m_axi_arlen;
+  logic                                          m_dm_vrf_ldr_m_axi_arlock;
+  logic [               2:0]                     m_dm_vrf_ldr_m_axi_arprot;
+  logic [               2:0]                     m_dm_vrf_ldr_m_axi_arsize;
+  logic                                          m_dm_vrf_ldr_m_axi_arvalid;
+  logic                                          m_dm_vrf_ldr_m_axi_arready;
+  logic [ VRF_DATAWIDTH-1:0]                     m_dm_vrf_ldr_m_axi_rdata;
+  logic                                          m_dm_vrf_ldr_m_axi_rlast;
+  logic [               1:0]                     m_dm_vrf_ldr_m_axi_rresp;
+  logic                                          m_dm_vrf_ldr_m_axi_rvalid;
+  logic                                          m_dm_vrf_ldr_m_axi_rready;
+
+  // Arbiter ports for vrf_ldr
+  logic                                          m_dm_vrf_ldr_full_o;
+  logic                                          m_dm_vrf_ldr_wr_req;
+  logic                                          m_dm_vrf_ldr_wr_gnt;
+  logic [ VRF_ADDRWIDTH-1:0]                     m_dm_vrf_ldr_wr_addr;
+  logic [ VRF_DATAWIDTH-1:0]                     m_dm_vrf_ldr_wr_data;
+
   // Instantiate ma module
   ma #(
     .NUM_OF_DDR4   (NUM_OF_DDR4),
@@ -56,38 +101,198 @@ module sim_ma_tb;
     .arf_en_o(arf_en_o),
     .arf_we_o(arf_we_o),
     .arf_addr_o(arf_addr_o),
-    .arf_dout_i(arf_dout_i)
+    .arf_dout_i(arf_dout_i),
+    .m_dm_mrf_m_axi_araddr(m_dm_mrf_m_axi_araddr),
+    .m_dm_mrf_m_axi_arburst(m_dm_mrf_m_axi_arburst),
+    .m_dm_mrf_m_axi_arcache(m_dm_mrf_m_axi_arcache),
+    .m_dm_mrf_m_axi_arlen(m_dm_mrf_m_axi_arlen),
+    .m_dm_mrf_m_axi_arlock(m_dm_mrf_m_axi_arlock),
+    .m_dm_mrf_m_axi_arprot(m_dm_mrf_m_axi_arprot),
+    .m_dm_mrf_m_axi_arsize(m_dm_mrf_m_axi_arsize),
+    .m_dm_mrf_m_axi_arvalid(m_dm_mrf_m_axi_arvalid),
+    .m_dm_mrf_m_axi_arready(m_dm_mrf_m_axi_arready),
+    .m_dm_mrf_m_axi_rdata(m_dm_mrf_m_axi_rdata),
+    .m_dm_mrf_m_axi_rlast(m_dm_mrf_m_axi_rlast),
+    .m_dm_mrf_m_axi_rresp(m_dm_mrf_m_axi_rresp),
+    .m_dm_mrf_m_axi_rvalid(m_dm_mrf_m_axi_rvalid),
+    .m_dm_mrf_m_axi_rready(m_dm_mrf_m_axi_rready),
+    .m_dm_mrf_bram_addr(m_dm_mrf_bram_addr),
+    .m_dm_mrf_bram_wrdata(m_dm_mrf_bram_wrdata),
+    .m_dm_mrf_bram_en(m_dm_mrf_bram_en),
+    .m_dm_mrf_bram_we(m_dm_mrf_bram_we),
+    .m_dm_vrf_ldr_m_axi_araddr(m_dm_vrf_ldr_m_axi_araddr),
+    .m_dm_vrf_ldr_m_axi_arburst(m_dm_vrf_ldr_m_axi_arburst),
+    .m_dm_vrf_ldr_m_axi_arcache(m_dm_vrf_ldr_m_axi_arcache),
+    .m_dm_vrf_ldr_m_axi_arlen(m_dm_vrf_ldr_m_axi_arlen),
+    .m_dm_vrf_ldr_m_axi_arlock(m_dm_vrf_ldr_m_axi_arlock),
+    .m_dm_vrf_ldr_m_axi_arprot(m_dm_vrf_ldr_m_axi_arprot),
+    .m_dm_vrf_ldr_m_axi_arsize(m_dm_vrf_ldr_m_axi_arsize),
+    .m_dm_vrf_ldr_m_axi_arvalid(m_dm_vrf_ldr_m_axi_arvalid),
+    .m_dm_vrf_ldr_m_axi_arready(m_dm_vrf_ldr_m_axi_arready),
+    .m_dm_vrf_ldr_m_axi_rdata(m_dm_vrf_ldr_m_axi_rdata),
+    .m_dm_vrf_ldr_m_axi_rlast(m_dm_vrf_ldr_m_axi_rlast),
+    .m_dm_vrf_ldr_m_axi_rresp(m_dm_vrf_ldr_m_axi_rresp),
+    .m_dm_vrf_ldr_m_axi_rvalid(m_dm_vrf_ldr_m_axi_rvalid),
+    .m_dm_vrf_ldr_m_axi_rready(m_dm_vrf_ldr_m_axi_rready),
+    .m_dm_vrf_ldr_full_o(m_dm_vrf_ldr_full_o),
+    .m_dm_vrf_ldr_wr_req(m_dm_vrf_ldr_wr_req),
+    .m_dm_vrf_ldr_wr_gnt(m_dm_vrf_ldr_wr_gnt),
+    .m_dm_vrf_ldr_wr_addr(m_dm_vrf_ldr_wr_addr),
+    .m_dm_vrf_ldr_wr_data(m_dm_vrf_ldr_wr_data)
   );
 
-  ram_1p # (
-    .DATAWIDTH(ARF_DATAWIDTH),
-    .DEPTH(32),
-    .MEMFILE("tb/init.mem"),
+  // ARF RAM instance
+  ram_1p #(
+    .DATAWIDTH (ARF_DATAWIDTH),
+    .DEPTH     (32),
+    .MEMFILE   ("tb/init.mem"),
     .READ_DELAY(2)
-  )
-  ram_1p_inst (
-    .clk(clk),
-    .en(arf_en_o),
-    .we(arf_we_o),
+  ) ram_1p_arf_inst (
+    .clk (clk),
+    .en  (arf_en_o),
+    .we  (arf_we_o),
     .addr(arf_addr_o),
-    .din(),
+    .din ('0),
     .dout(arf_dout_i)
   );
 
+  // MRF BRAM instances
+  generate
+    for (genvar i = 0; i < 4; i++) begin : mrf_bram
+      ram_1p #(
+        .DATAWIDTH (MRF_DATAWIDTH),
+        .DEPTH     (64),
+        .MEMFILE   (""),
+        .READ_DELAY(1)
+      ) ram_1p_mrf_inst (
+        .clk (clk),
+        .en  (m_dm_mrf_bram_en[i]),
+        .we  (m_dm_mrf_bram_we[i]),
+        .addr(m_dm_mrf_bram_addr[i]),
+        .din (m_dm_mrf_bram_wrdata[i]),
+        .dout()
+      );
+    end
+  endgenerate
+
+  // Arbiter instance for VRF load
+  arbiter #(
+    .LATENCY(10)
+  ) arbiter_inst (
+    .clk(clk),
+    .rst_n(rst_n),
+    .wr_req(m_dm_vrf_ldr_wr_req),
+    .wr_gnt(m_dm_vrf_ldr_wr_gnt),
+    .wr_addr(m_dm_vrf_ldr_wr_addr),
+    .wr_data(m_dm_vrf_ldr_wr_data),
+    .addra(),
+    .douta(),
+    .dina(),
+    .ena(),
+    .wea()
+  );
+
+  // VRF RAM instance
+  ram_1p #(
+    .DATAWIDTH (VRF_DATAWIDTH),
+    .DEPTH     (1024),
+    .MEMFILE   (""),
+    .READ_DELAY(1)
+  ) ram_1p_vrf_inst (
+    .clk (clk),
+    .en  (arbiter_inst.ena),
+    .we  (arbiter_inst.wea),
+    .addr(arbiter_inst.addra),
+    .din (arbiter_inst.dina),
+    .dout(arbiter_inst.douta)
+  );
+
+  // Clock generation
   initial begin
     clk = 0;
     forever #(CLK_PERIOD / 2) clk = ~clk;
   end
 
+  // Reset and calibration
   initial begin
     ma_ddr4_calib_complete_i = 4'hF;
     rst_n                    = 0;
     repeat (5) @(posedge clk);
     rst_n = 1;
     repeat (20) @(posedge clk);
-    ma_ddr4_calib_complete_i = 1;
+    ma_ddr4_calib_complete_i = 4'b1111;
   end
 
+  // AXI slave emulation for MRF
+  logic [0:3][7:0] mrf_axi_transfer_count;
+  always @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+      m_dm_mrf_m_axi_arready <= 0;
+      m_dm_mrf_m_axi_rdata   <= 0;
+      m_dm_mrf_m_axi_rlast   <= 0;
+      m_dm_mrf_m_axi_rresp   <= 0;
+      m_dm_mrf_m_axi_rvalid  <= 0;
+      mrf_axi_transfer_count <= 0;
+    end else begin
+      for (int i = 0; i < 4; i++) begin
+        if (m_dm_mrf_m_axi_arvalid[i] && !m_dm_mrf_m_axi_arready[i]) begin
+          m_dm_mrf_m_axi_arready[i] <= 1;
+          @(posedge clk);
+          m_dm_mrf_m_axi_arready[i] <= 0;
+          mrf_axi_transfer_count[i] <= 0;
+          repeat (2) @(posedge clk);
+          while (mrf_axi_transfer_count[i] <= m_dm_mrf_m_axi_arlen[i]) begin
+            if (m_dm_mrf_m_axi_rready[i]) begin
+              m_dm_mrf_m_axi_rvalid[i]  <= 1;
+              m_dm_mrf_m_axi_rdata[i]   <= mrf_axi_transfer_count[i];
+              m_dm_mrf_m_axi_rresp[i]   <= 2'b00;
+              m_dm_mrf_m_axi_rlast[i]   <= (mrf_axi_transfer_count[i] == m_dm_mrf_m_axi_arlen[i]);
+              mrf_axi_transfer_count[i] <= mrf_axi_transfer_count[i] + 1;
+              @(posedge clk);
+            end
+          end
+          m_dm_mrf_m_axi_rvalid[i] <= 0;
+          m_dm_mrf_m_axi_rlast[i]  <= 0;
+        end
+      end
+    end
+  end
+
+  // AXI slave emulation for VRF load
+  logic [7:0] vrf_ldr_axi_transfer_count;
+  always @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+      m_dm_vrf_ldr_m_axi_arready <= 0;
+      m_dm_vrf_ldr_m_axi_rdata   <= 0;
+      m_dm_vrf_ldr_m_axi_rlast   <= 0;
+      m_dm_vrf_ldr_m_axi_rresp   <= 0;
+      m_dm_vrf_ldr_m_axi_rvalid  <= 0;
+      vrf_ldr_axi_transfer_count <= 0;
+    end else begin
+      if (m_dm_vrf_ldr_m_axi_arvalid && !m_dm_vrf_ldr_m_axi_arready) begin
+        m_dm_vrf_ldr_m_axi_arready <= 1;
+        @(posedge clk);
+        m_dm_vrf_ldr_m_axi_arready <= 0;
+        vrf_ldr_axi_transfer_count <= 0;
+        repeat (2) @(posedge clk);
+        while (vrf_ldr_axi_transfer_count <= m_dm_vrf_ldr_m_axi_arlen) begin
+          if (m_dm_vrf_ldr_m_axi_rready) begin
+            m_dm_vrf_ldr_m_axi_rvalid  <= 1;
+            m_dm_vrf_ldr_m_axi_rdata   <= vrf_ldr_axi_transfer_count + 5;
+            m_dm_vrf_ldr_m_axi_rresp   <= 2'b00;
+            m_dm_vrf_ldr_m_axi_rlast   <= (vrf_ldr_axi_transfer_count == m_dm_vrf_ldr_m_axi_arlen);
+            vrf_ldr_axi_transfer_count <= vrf_ldr_axi_transfer_count + 1;
+            @(posedge clk);
+          end
+        end
+        m_dm_vrf_ldr_m_axi_rvalid <= 0;
+        m_dm_vrf_ldr_m_axi_rlast  <= 0;
+      end
+    end
+  end
+
+
+  // Test case
   initial begin
     ma_start_i           = 0;
     ma_select_v_m_i      = 0;
@@ -108,15 +313,17 @@ module sim_ma_tb;
     ma_start_i = 0;
     @(posedge ma_done_o);
 
-    repeat (5) @(posedge clk);
+    repeat (300) @(posedge clk);
     $finish;
   end
 
+  // Timeout
   initial begin
     repeat (1000) @(posedge clk);
     $finish;
   end
 
+  // Waveform dump
   initial begin
     $dumpfile("sim_ma_tb.vcd");
     $dumpvars(0, sim_ma_tb);
