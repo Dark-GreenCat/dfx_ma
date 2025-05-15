@@ -1,7 +1,5 @@
 `timescale 1ns / 1ps
 
-`include "ma_define.sv"
-
 module ma #(
   parameter NUM_OF_DDR4 = 4,
   parameter DDR4_ADDRWIDTH = 36,
@@ -32,37 +30,24 @@ module ma #(
   input  [ARF_DATAWIDTH-1:0] arf_dout_i
 );
 
-  // Internal instantiation of datamover interfaces
-  datamover_if #(
-    .AXI_ADDR_WIDTH  (DDR4_ADDRWIDTH),
-    .BRAM_ADDR_WIDTH (MRF_ADDRWIDTH),
-    .BYTE_TRANS_WIDTH(15)
-  ) m_dm_mrf3 ();
-  datamover_if #(
-    .AXI_ADDR_WIDTH  (DDR4_ADDRWIDTH),
-    .BRAM_ADDR_WIDTH (MRF_ADDRWIDTH),
-    .BYTE_TRANS_WIDTH(15)
-  ) m_dm_mrf2 ();
-  datamover_if #(
-    .AXI_ADDR_WIDTH  (DDR4_ADDRWIDTH),
-    .BRAM_ADDR_WIDTH (MRF_ADDRWIDTH),
-    .BYTE_TRANS_WIDTH(15)
-  ) m_dm_mrf1 ();
-  datamover_if #(
-    .AXI_ADDR_WIDTH  (DDR4_ADDRWIDTH),
-    .BRAM_ADDR_WIDTH (MRF_ADDRWIDTH),
-    .BYTE_TRANS_WIDTH(15)
-  ) m_dm_mrf0 ();
-  datamover_if #(
-    .AXI_ADDR_WIDTH  (DDR4_ADDRWIDTH),
-    .BRAM_ADDR_WIDTH (VRF_ADDRWIDTH),
-    .BYTE_TRANS_WIDTH(15)
-  ) m_dm_vrf_ldr ();
-  datamover_if #(
-    .AXI_ADDR_WIDTH  (DDR4_ADDRWIDTH),
-    .BRAM_ADDR_WIDTH (VRF_ADDRWIDTH),
-    .BYTE_TRANS_WIDTH(15)
-  ) m_dm_vrf_str ();
+  // Internal signals for datamover connections
+  logic [               0:3]                     m_dm_mrf_start;
+  logic [               0:3][DDR4_ADDRWIDTH-1:0] m_dm_mrf_src_axi_addr;
+  logic [               0:3][ MRF_ADDRWIDTH-1:0] m_dm_mrf_dst_bram_addr;
+  logic [               0:3][              14:0] m_dm_mrf_byte_to_trans;
+  logic [               0:3]                     m_dm_mrf_done;
+
+  logic                                          m_dm_vrf_ldr_start;
+  logic [DDR4_ADDRWIDTH-1:0]                     m_dm_vrf_ldr_src_axi_addr;
+  logic [ VRF_ADDRWIDTH-1:0]                     m_dm_vrf_ldr_dst_bram_addr;
+  logic [              14:0]                     m_dm_vrf_ldr_byte_to_trans;
+  logic                                          m_dm_vrf_ldr_done;
+
+  logic                                          m_dm_vrf_str_start;
+  logic [DDR4_ADDRWIDTH-1:0]                     m_dm_vrf_str_dst_axi_addr;
+  logic [ VRF_ADDRWIDTH-1:0]                     m_dm_vrf_str_src_bram_addr;
+  logic [              14:0]                     m_dm_vrf_str_byte_to_trans;
+  logic                                          m_dm_vrf_str_done;
 
   ma_controller #(
     .NUM_OF_DDR4   (NUM_OF_DDR4),
@@ -89,12 +74,21 @@ module ma #(
     .arf_we_o(arf_we_o),
     .arf_addr_o(arf_addr_o),
     .arf_dout_i(arf_dout_i),
-    .m_dm_mrf3(m_dm_mrf3.master),
-    .m_dm_mrf2(m_dm_mrf2.master),
-    .m_dm_mrf1(m_dm_mrf1.master),
-    .m_dm_mrf0(m_dm_mrf0.master),
-    .m_dm_vrf_ldr(m_dm_vrf_ldr.master),
-    .m_dm_vrf_str(m_dm_vrf_str.master)
+    .m_dm_mrf_start(m_dm_mrf_start),
+    .m_dm_mrf_src_axi_addr(m_dm_mrf_src_axi_addr),
+    .m_dm_mrf_dst_bram_addr(m_dm_mrf_dst_bram_addr),
+    .m_dm_mrf_byte_to_trans(m_dm_mrf_byte_to_trans),
+    .m_dm_mrf_done(m_dm_mrf_done),
+    .m_dm_vrf_ldr_start(m_dm_vrf_ldr_start),
+    .m_dm_vrf_ldr_src_axi_addr(m_dm_vrf_ldr_src_axi_addr),
+    .m_dm_vrf_ldr_dst_bram_addr(m_dm_vrf_ldr_dst_bram_addr),
+    .m_dm_vrf_ldr_byte_to_trans(m_dm_vrf_ldr_byte_to_trans),
+    .m_dm_vrf_ldr_done(m_dm_vrf_ldr_done),
+    .m_dm_vrf_str_start(m_dm_vrf_str_start),
+    .m_dm_vrf_str_dst_axi_addr(m_dm_vrf_str_dst_axi_addr),
+    .m_dm_vrf_str_src_bram_addr(m_dm_vrf_str_src_bram_addr),
+    .m_dm_vrf_str_byte_to_trans(m_dm_vrf_str_byte_to_trans),
+    .m_dm_vrf_str_done(m_dm_vrf_str_done)
   );
 
 endmodule

@@ -1,10 +1,15 @@
 # Makefile for compiling and simulating ram_2p with QuestaSim
+
+# Detect OS and set shell
 ifeq ($(OS),Windows_NT)
     SHELL := pwsh.exe
+    SHELLFLAGS := -NoProfile -Command
+    RM := Remove-Item -Force -Recurse -ErrorAction SilentlyContinue
 else
-   SHELL := pwsh
+    SHELL := /bin/bash
+    SHELLFLAGS := -c
+    RM := rm -rf
 endif
-.SHELLFLAGS := -NoProfile -Command 
 
 # Tool settings
 VLOG = vlog
@@ -26,9 +31,6 @@ VSIM_FLAGS = -c -voptargs=+acc=npr
 VLOG_FLAGS = -sv
 DO_SCRIPT = "vlog $(TB_SRC); vsim $(VSIM_FLAGS) $(TOP_MODULE); run -all"
 
-# System flags
-RM_FLAGS = -Force -Recurse -ErrorAction SilentlyContinue
-
 # Targets
 all: compile sim
 
@@ -37,13 +39,16 @@ compile:
 	$(VLOG) $(VLOG_FLAGS) $(RTL_SRC) $(TB_SRC)
 
 # Run simulation
-sim: compile
+sim:
 	$(VSIM) -c -do $(DO_SCRIPT)
 
 # Clean generated files
 clean:
-	-rm $(RM_FLAGS) $(WORK_DIR)
-	-rm $(RM_FLAGS) transcript
-	-rm $(RM_FLAGS) *.vcd
+	$(RM) $(WORK_DIR)
+	$(RM) transcript
+	$(RM) *.vcd
+
+wave:
+	gtkwave $(TOP_MODULE).vcd &
 
 .PHONY: all compile sim clean
